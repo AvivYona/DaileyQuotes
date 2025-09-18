@@ -4,7 +4,7 @@ import { Author, AuthorSchema } from './author.schema';
 
 export type QuoteDocument = Quote & Document;
 
-@Schema({ collection: 'quotes' })
+@Schema({ collection: 'quotes', versionKey: false })
 export class Quote {
   @Prop({ type: Types.ObjectId, ref: 'Author', required: true })
   author: Types.ObjectId;

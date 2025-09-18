@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 export type AuthorDocument = Author & Document;
 
-@Schema({ collection: 'authors' })
+@Schema({ collection: 'authors', versionKey: false })
 export class Author {
   @Prop({ required: true, unique: true })
   name: string;
