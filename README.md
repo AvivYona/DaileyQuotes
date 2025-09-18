@@ -1,0 +1,2 @@
+# DaileyQuotes
+Dailey Quotes Judaism
