@@ -24,7 +24,7 @@ __decorate([
     __metadata("design:type", String)
 ], Quote.prototype, "quote", void 0);
 exports.Quote = Quote = __decorate([
-    (0, mongoose_1.Schema)({ collection: 'quotes' })
+    (0, mongoose_1.Schema)({ collection: 'quotes', versionKey: false })
 ], Quote);
 exports.QuoteSchema = mongoose_1.SchemaFactory.createForClass(Quote);
 //# sourceMappingURL=quote.schema.js.map

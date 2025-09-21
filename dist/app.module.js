@@ -9,8 +9,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
-const app_controller_1 = require("./app.controller");
-const app_service_1 = require("./app.service");
 const authors_module_1 = require("./authors/authors.module");
 const quotes_module_1 = require("./quotes/quotes.module");
 const database_config_1 = require("./config/database.config");
@@ -20,12 +18,22 @@ exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            mongoose_1.MongooseModule.forRoot(database_config_1.databaseConfig.uri),
+            mongoose_1.MongooseModule.forRoot(database_config_1.databaseConfig.uri, {
+                connectionFactory: (connection) => {
+                    connection.on('connected', () => {
+                        console.log('MongoDB connected successfully');
+                    });
+                    connection.on('error', (error) => {
+                        console.error('MongoDB connection error:', error);
+                    });
+                    return connection;
+                },
+            }),
             authors_module_1.AuthorsModule,
             quotes_module_1.QuotesModule,
         ],
-        controllers: [app_controller_1.AppController],
-        providers: [app_service_1.AppService],
+        controllers: [],
+        providers: [],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map

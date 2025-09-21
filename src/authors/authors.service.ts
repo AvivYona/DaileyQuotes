@@ -11,16 +11,20 @@ export class AuthorsService {
     @InjectModel(Author.name) private authorModel: Model<AuthorDocument>,
   ) {}
 
-  async create(createAuthorDto: CreateAuthorDto): Promise<Author> {
+  async create(createAuthorDto: CreateAuthorDto): Promise<AuthorDocument> {
     const createdAuthor = new this.authorModel(createAuthorDto);
     return createdAuthor.save();
   }
 
-  async findAll(): Promise<Author[]> {
-    return this.authorModel.find().exec();
+  async findAll(): Promise<AuthorDocument[]> {
+    console.log('Database name:', this.authorModel.db.name);
+    console.log('Collection name:', this.authorModel.collection.name);
+    const result = await this.authorModel.find().exec();
+    console.log('Query result:', result);
+    return result;
   }
 
-  async findOne(id: string): Promise<Author> {
+  async findOne(id: string): Promise<AuthorDocument> {
     const author = await this.authorModel.findById(id).exec();
     if (!author) {
       throw new NotFoundException(`Author with ID ${id} not found`);
@@ -28,7 +32,7 @@ export class AuthorsService {
     return author;
   }
 
-  async update(id: string, updateAuthorDto: UpdateAuthorDto): Promise<Author> {
+  async update(id: string, updateAuthorDto: UpdateAuthorDto): Promise<AuthorDocument> {
     const updatedAuthor = await this.authorModel
       .findByIdAndUpdate(id, updateAuthorDto, { new: true })
       .exec();

@@ -19,7 +19,7 @@ __decorate([
     __metadata("design:type", String)
 ], Author.prototype, "name", void 0);
 exports.Author = Author = __decorate([
-    (0, mongoose_1.Schema)({ collection: 'authors' })
+    (0, mongoose_1.Schema)({ collection: 'authors', versionKey: false })
 ], Author);
 exports.AuthorSchema = mongoose_1.SchemaFactory.createForClass(Author);
 //# sourceMappingURL=author.schema.js.map

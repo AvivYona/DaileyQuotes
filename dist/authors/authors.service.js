@@ -26,7 +26,11 @@ let AuthorsService = class AuthorsService {
         return createdAuthor.save();
     }
     async findAll() {
-        return this.authorModel.find().exec();
+        console.log('Database name:', this.authorModel.db.name);
+        console.log('Collection name:', this.authorModel.collection.name);
+        const result = await this.authorModel.find().exec();
+        console.log('Query result:', result);
+        return result;
     }
     async findOne(id) {
         const author = await this.authorModel.findById(id).exec();
