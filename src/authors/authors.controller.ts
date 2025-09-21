@@ -10,33 +10,45 @@ import {
 import { AuthorsService } from './authors.service';
 import { CreateAuthorDto } from '../dto/create-author.dto';
 import { UpdateAuthorDto } from '../dto/update-author.dto';
+import { PasswordProtected } from '../auth/password-protected.decorator';
 
 @Controller('authors')
 export class AuthorsController {
   constructor(private readonly authorsService: AuthorsService) {}
 
   @Post()
-  create(@Body() createAuthorDto: CreateAuthorDto) {
-    return this.authorsService.create(createAuthorDto);
+  @PasswordProtected()
+  async create(@Body() createAuthorDto: CreateAuthorDto) {
+    const result = await this.authorsService.create(createAuthorDto);
+    return result;
   }
 
   @Get()
-  findAll() {
-    return this.authorsService.findAll();
+  async findAll() {
+    const result = await this.authorsService.findAll();
+    return result;
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.authorsService.findOne(id);
+  async findOne(@Param('id') id: string) {
+    const result = await this.authorsService.findOne(id);
+    return result;
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAuthorDto: UpdateAuthorDto) {
-    return this.authorsService.update(id, updateAuthorDto);
+  @PasswordProtected()
+  async update(
+    @Param('id') id: string,
+    @Body() updateAuthorDto: UpdateAuthorDto,
+  ) {
+    const result = await this.authorsService.update(id, updateAuthorDto);
+    return result;
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.authorsService.remove(id);
+  @PasswordProtected()
+  async remove(@Param('id') id: string) {
+    await this.authorsService.remove(id);
+    return { message: 'Author deleted successfully' };
   }
 }
