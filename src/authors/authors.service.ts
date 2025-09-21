@@ -31,7 +31,7 @@ export class AuthorsService {
   }
 
   async findAll(): Promise<AuthorDocument[]> {
-    const result = await this.authorModel.find().exec();
+    const result = await this.authorModel.find().lean().exec();
     return result;
   }
 
