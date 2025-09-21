@@ -10,12 +10,14 @@ import {
 import { AuthorsService } from './authors.service';
 import { CreateAuthorDto } from '../dto/create-author.dto';
 import { UpdateAuthorDto } from '../dto/update-author.dto';
+import { PasswordProtected } from '../auth/password-protected.decorator';
 
 @Controller('authors')
 export class AuthorsController {
   constructor(private readonly authorsService: AuthorsService) {}
 
   @Post()
+  @PasswordProtected()
   async create(@Body() createAuthorDto: CreateAuthorDto) {
     const result = await this.authorsService.create(createAuthorDto);
     return result;
@@ -34,12 +36,17 @@ export class AuthorsController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateAuthorDto: UpdateAuthorDto) {
+  @PasswordProtected()
+  async update(
+    @Param('id') id: string,
+    @Body() updateAuthorDto: UpdateAuthorDto,
+  ) {
     const result = await this.authorsService.update(id, updateAuthorDto);
     return result;
   }
 
   @Delete(':id')
+  @PasswordProtected()
   async remove(@Param('id') id: string) {
     await this.authorsService.remove(id);
     return { message: 'Author deleted successfully' };

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Author, AuthorDocument } from '../schemas/author.schema';
@@ -12,6 +16,16 @@ export class AuthorsService {
   ) {}
 
   async create(createAuthorDto: CreateAuthorDto): Promise<AuthorDocument> {
+    // Check if author with this name already exists
+    const existingAuthor = await this.authorModel
+      .findOne({ name: createAuthorDto.name })
+      .exec();
+    if (existingAuthor) {
+      throw new ConflictException(
+        `Author with name '${createAuthorDto.name}' already exists`,
+      );
+    }
+
     const createdAuthor = new this.authorModel(createAuthorDto);
     return createdAuthor.save();
   }
@@ -33,6 +47,18 @@ export class AuthorsService {
     id: string,
     updateAuthorDto: UpdateAuthorDto,
   ): Promise<AuthorDocument> {
+    // If updating the name, check if another author with this name already exists
+    if (updateAuthorDto.name) {
+      const existingAuthor = await this.authorModel
+        .findOne({ name: updateAuthorDto.name, _id: { $ne: id } })
+        .exec();
+      if (existingAuthor) {
+        throw new ConflictException(
+          `Author with name '${updateAuthorDto.name}' already exists`,
+        );
+      }
+    }
+
     const updatedAuthor = await this.authorModel
       .findByIdAndUpdate(id, updateAuthorDto, { new: true })
       .exec();
