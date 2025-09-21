@@ -5,19 +5,6 @@ import { databaseConfig } from './config/database.config';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-
-  // Memory monitoring
-  const logMemoryUsage = () => {
-    const used = process.memoryUsage();
-    logger.log(
-      `Memory Usage: RSS: ${Math.round(used.rss / 1024 / 1024)}MB, Heap Used: ${Math.round(used.heapUsed / 1024 / 1024)}MB, Heap Total: ${Math.round(used.heapTotal / 1024 / 1024)}MB`,
-    );
-  };
-
-  // Log memory usage every 30 seconds
-  setInterval(logMemoryUsage, 30000);
-  logMemoryUsage(); // Log initial memory usage
-
   const app = await NestFactory.create(AppModule);
 
   // Enable CORS
