@@ -17,10 +17,7 @@ export class AuthorsService {
   }
 
   async findAll(): Promise<AuthorDocument[]> {
-    console.log('Database name:', this.authorModel.db.name);
-    console.log('Collection name:', this.authorModel.collection.name);
     const result = await this.authorModel.find().exec();
-    console.log('Query result:', result);
     return result;
   }
 
@@ -32,7 +29,10 @@ export class AuthorsService {
     return author;
   }
 
-  async update(id: string, updateAuthorDto: UpdateAuthorDto): Promise<AuthorDocument> {
+  async update(
+    id: string,
+    updateAuthorDto: UpdateAuthorDto,
+  ): Promise<AuthorDocument> {
     const updatedAuthor = await this.authorModel
       .findByIdAndUpdate(id, updateAuthorDto, { new: true })
       .exec();
