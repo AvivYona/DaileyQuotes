@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Quote, QuoteDocument } from '../schemas/quote.schema';
+import { Author, AuthorDocument } from '../schemas/author.schema';
 import { CreateQuoteDto } from '../dto/create-quote.dto';
 import { UpdateQuoteDto } from '../dto/update-quote.dto';
 
@@ -9,12 +10,28 @@ import { UpdateQuoteDto } from '../dto/update-quote.dto';
 export class QuotesService {
   constructor(
     @InjectModel(Quote.name) private quoteModel: Model<QuoteDocument>,
+    @InjectModel(Author.name) private authorModel: Model<AuthorDocument>,
   ) {}
 
+  private async ensureAuthorExists(authorId: string): Promise<Types.ObjectId> {
+    if (!Types.ObjectId.isValid(authorId)) {
+      throw new NotFoundException(`Author with ID ${authorId} not found`);
+    }
+
+    const normalizedId = new Types.ObjectId(authorId);
+    const authorExists = await this.authorModel.exists({ _id: normalizedId });
+    if (!authorExists) {
+      throw new NotFoundException(`Author with ID ${authorId} not found`);
+    }
+
+    return normalizedId;
+  }
+
   async create(createQuoteDto: CreateQuoteDto): Promise<Quote> {
+    const authorId = await this.ensureAuthorExists(createQuoteDto.author);
     const createdQuote = new this.quoteModel({
       ...createQuoteDto,
-      author: new Types.ObjectId(createQuoteDto.author),
+      author: authorId,
     });
     return createdQuote.save();
   }
@@ -49,7 +66,7 @@ export class QuotesService {
   async update(id: string, updateQuoteDto: UpdateQuoteDto): Promise<Quote> {
     const updateData: any = { ...updateQuoteDto };
     if (updateQuoteDto.author) {
-      updateData.author = new Types.ObjectId(updateQuoteDto.author);
+      updateData.author = await this.ensureAuthorExists(updateQuoteDto.author);
     }
 
     const updatedQuote = await this.quoteModel
