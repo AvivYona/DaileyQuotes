@@ -24,18 +24,13 @@ export class QuotesController {
   }
 
   @Get()
-  findAll(
-    @Query('author') authorId?: string,
-    @Query('limit') limit?: string,
-    @Query('skip') skip?: string,
-  ) {
-    const limitNum = limit ? parseInt(limit, 10) : 100;
-    const skipNum = skip ? parseInt(skip, 10) : 0;
+  findAll() {
+    return this.quotesService.findAll();
+  }
 
-    if (authorId) {
-      return this.quotesService.findByAuthor(authorId, limitNum, skipNum);
-    }
-    return this.quotesService.findAll(limitNum, skipNum);
+  @Get('/author/:id')
+  findByAuthor(@Param('id') authorId?: string) {
+    return this.quotesService.findByAuthor(authorId);
   }
 
   @Get(':id')

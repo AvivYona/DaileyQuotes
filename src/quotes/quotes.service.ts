@@ -19,13 +19,11 @@ export class QuotesService {
     return createdQuote.save();
   }
 
-  async findAll(limit: number = 100, skip: number = 0): Promise<Quote[]> {
+  async findAll(): Promise<Quote[]> {
     return this.quoteModel
       .find()
       .populate('author', 'name')
       .lean() // Use lean() to return plain JavaScript objects instead of Mongoose documents
-      .limit(limit)
-      .skip(skip)
       .exec();
   }
 
@@ -40,17 +38,11 @@ export class QuotesService {
     return quote;
   }
 
-  async findByAuthor(
-    authorId: string,
-    limit: number = 100,
-    skip: number = 0,
-  ): Promise<Quote[]> {
+  async findByAuthor(authorId: string): Promise<Quote[]> {
     return this.quoteModel
       .find({ author: new Types.ObjectId(authorId) })
       .populate('author', 'name')
       .lean() // Use lean() to return plain JavaScript objects instead of Mongoose documents
-      .limit(limit)
-      .skip(skip)
       .exec();
   }
 

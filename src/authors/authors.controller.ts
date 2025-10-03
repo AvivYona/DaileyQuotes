@@ -19,20 +19,17 @@ export class AuthorsController {
   @Post()
   @PasswordProtected()
   async create(@Body() createAuthorDto: CreateAuthorDto) {
-    const result = await this.authorsService.create(createAuthorDto);
-    return result;
+    return this.authorsService.create(createAuthorDto);
   }
 
   @Get()
   async findAll() {
-    const result = await this.authorsService.findAll();
-    return result;
+    return this.authorsService.findAll();
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    const result = await this.authorsService.findOne(id);
-    return result;
+    return this.authorsService.findOne(id);
   }
 
   @Patch(':id')
@@ -41,8 +38,7 @@ export class AuthorsController {
     @Param('id') id: string,
     @Body() updateAuthorDto: UpdateAuthorDto,
   ) {
-    const result = await this.authorsService.update(id, updateAuthorDto);
-    return result;
+    return this.authorsService.update(id, updateAuthorDto);
   }
 
   @Delete(':id')

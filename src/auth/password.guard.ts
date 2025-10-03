@@ -13,6 +13,10 @@ export class PasswordGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const password = request.headers['x-api-password'];
 
+    if (!this.expectedPassword) {
+      throw new UnauthorizedException('Backend env is missing');
+    }
+
     if (!password) {
       throw new UnauthorizedException('Password header is required');
     }
