@@ -30,9 +30,8 @@ export class AuthorsService {
     return createdAuthor.save();
   }
 
-  async findAll(): Promise<AuthorDocument[]> {
-    const result = await this.authorModel.find().lean().exec();
-    return result;
+  async findAll(): Promise<Author[]> {
+    return this.authorModel.find().lean().exec();
   }
 
   async findOne(id: string): Promise<AuthorDocument> {
