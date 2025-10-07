@@ -11,6 +11,7 @@ import { AuthorsService } from './authors.service';
 import { CreateAuthorDto } from '../dto/create-author.dto';
 import { UpdateAuthorDto } from '../dto/update-author.dto';
 import { PasswordProtected } from '../auth/password-protected.decorator';
+import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 
 @Controller('authors')
 export class AuthorsController {
@@ -19,35 +20,31 @@ export class AuthorsController {
   @Post()
   @PasswordProtected()
   async create(@Body() createAuthorDto: CreateAuthorDto) {
-    const result = await this.authorsService.create(createAuthorDto);
-    return result;
+    return this.authorsService.create(createAuthorDto);
   }
 
   @Get()
   async findAll() {
-    const result = await this.authorsService.findAll();
-    return result;
+    return this.authorsService.findAll();
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const result = await this.authorsService.findOne(id);
-    return result;
+  async findOne(@Param('id', ParseMongoIdPipe) id: string) {
+    return this.authorsService.findOne(id);
   }
 
   @Patch(':id')
   @PasswordProtected()
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseMongoIdPipe) id: string,
     @Body() updateAuthorDto: UpdateAuthorDto,
   ) {
-    const result = await this.authorsService.update(id, updateAuthorDto);
-    return result;
+    return this.authorsService.update(id, updateAuthorDto);
   }
 
   @Delete(':id')
   @PasswordProtected()
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id', ParseMongoIdPipe) id: string) {
     await this.authorsService.remove(id);
     return { message: 'Author deleted successfully' };
   }
