@@ -6,13 +6,13 @@ export type BackgroundDocument = Background & Document;
 @Schema({ collection: 'backgrounds', versionKey: false })
 export class Background {
   @Prop({ required: true })
-  data: Buffer;
-
-  @Prop({ required: true })
   contentType: string;
 
+  @Prop({ required: true })
+  filename: string;
+
   @Prop()
-  filename?: string;
+  size?: number;
 }
 
 export const BackgroundSchema = SchemaFactory.createForClass(Background);
