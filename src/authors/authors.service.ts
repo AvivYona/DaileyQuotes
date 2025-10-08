@@ -8,11 +8,13 @@ import { Model } from 'mongoose';
 import { Author, AuthorDocument } from '../schemas/author.schema';
 import { CreateAuthorDto } from '../dto/create-author.dto';
 import { UpdateAuthorDto } from '../dto/update-author.dto';
+import { Quote, QuoteDocument } from '../schemas/quote.schema';
 
 @Injectable()
 export class AuthorsService {
   constructor(
     @InjectModel(Author.name) private authorModel: Model<AuthorDocument>,
+    @InjectModel(Quote.name) private quoteModel: Model<QuoteDocument>,
   ) {}
 
   async create(createAuthorDto: CreateAuthorDto): Promise<AuthorDocument> {
@@ -72,5 +74,7 @@ export class AuthorsService {
     if (!result) {
       throw new NotFoundException(`Author with ID ${id} not found`);
     }
+
+    await this.quoteModel.deleteMany({ author: result._id }).exec();
   }
 }
