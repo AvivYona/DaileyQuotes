@@ -7,11 +7,10 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { BackgroundsService } from './backgrounds.service';
+import { BackgroundsService, BackgroundWithData } from './backgrounds.service';
 import { PasswordProtected } from '../auth/password-protected.decorator';
 import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { BackgroundDocument } from '../schemas/background.schema';
 import { memoryStorage } from 'multer';
 
 @Controller('backgrounds')
@@ -51,7 +50,7 @@ export class BackgroundsController {
     return { message: 'Background deleted successfully' };
   }
 
-  private serialize(background: BackgroundDocument) {
+  private serialize(background: BackgroundWithData) {
     return {
       id: background.id,
       contentType: background.contentType,
