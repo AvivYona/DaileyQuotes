@@ -102,21 +102,19 @@ export class BackgroundsService {
     );
   }
 
-  async remove(id: string): Promise<void> {
-    const background = await this.backgroundModel.findById(id).exec();
+  async removeByFileName(fileName: string): Promise<void> {
+    const background = await this.backgroundModel
+      .findOne({ filename: fileName })
+      .exec();
     if (!background) {
-      throw new NotFoundException(`Background with ID ${id} not found`);
-    }
-
-    if (!background.filename) {
       throw new NotFoundException(
-        `Background ${background.id} has no associated image filename`,
+        `Background with filename ${fileName} not found`,
       );
     }
 
-    await this.deleteFromS3(background.filename);
+    await this.deleteFromS3(fileName);
 
-    await this.backgroundModel.deleteOne({ _id: id }).exec();
+    await this.backgroundModel.deleteOne({ _id: background._id }).exec();
   }
 
   private async mapToBackgroundWithData(
