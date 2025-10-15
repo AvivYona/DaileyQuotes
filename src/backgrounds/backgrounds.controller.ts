@@ -7,7 +7,11 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { BackgroundsService, BackgroundWithData } from './backgrounds.service';
+import {
+  BackgroundsService,
+  BackgroundWithData,
+  UploadedImage,
+} from './backgrounds.service';
 import { PasswordProtected } from '../auth/password-protected.decorator';
 import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -25,14 +29,7 @@ export class BackgroundsController {
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
   )
-  async create(
-    @UploadedFile()
-    file: {
-      buffer: Buffer;
-      mimetype: string;
-      originalname: string;
-    },
-  ) {
+  async create(@UploadedFile() file?: UploadedImage) {
     const background = await this.backgroundsService.create(file);
     return this.serialize(background);
   }

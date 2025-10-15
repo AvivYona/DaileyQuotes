@@ -17,9 +17,11 @@ import { fromBuffer as detectFileTypeFromBuffer } from 'file-type';
 import { Readable } from 'stream';
 import { Background, BackgroundDocument } from '../schemas/background.schema';
 
-interface UploadedImage {
+export interface UploadedImage {
   buffer: Buffer;
   mimetype?: string;
+  originalname?: string;
+  fieldname?: string;
 }
 
 export interface BackgroundWithData {
@@ -232,10 +234,6 @@ export class BackgroundsService {
     const detected = await detectFileTypeFromBuffer(file.buffer);
     if (detected?.mime) {
       return detected.mime;
-    }
-
-    if (file.mimetype) {
-      return file.mimetype;
     }
 
     return 'application/octet-stream';
