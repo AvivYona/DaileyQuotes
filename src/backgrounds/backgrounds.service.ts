@@ -24,11 +24,17 @@ export interface UploadedImage {
   fieldname?: string;
 }
 
-export interface BackgroundWithData {
+export interface BackgroundMetadata {
   id: string;
   contentType: string;
   filename: string;
-  data: Buffer;
+  size?: number;
+}
+
+export interface BackgroundFile {
+  stream: Readable;
+  contentType: string;
+  contentLength?: number;
 }
 
 @Injectable()
@@ -51,7 +57,7 @@ export class BackgroundsService {
     this.s3Client = new S3Client({ region });
   }
 
-  async create(file: UploadedImage | undefined): Promise<BackgroundWithData> {
+  async create(file: UploadedImage | undefined): Promise<BackgroundMetadata> {
     if (!file) {
       throw new BadRequestException('Image file is required');
     }
@@ -84,7 +90,7 @@ export class BackgroundsService {
       });
 
       const savedBackground = await createdBackground.save();
-      return this.mapToBackgroundWithData(savedBackground, file.buffer);
+      return this.toMetadata(savedBackground);
     } catch (error) {
       await this.safeDeleteFromS3(filename);
       this.logger.error(
@@ -95,11 +101,29 @@ export class BackgroundsService {
     }
   }
 
-  async findAll(): Promise<BackgroundWithData[]> {
+  async findAll(): Promise<BackgroundMetadata[]> {
     const backgrounds = await this.backgroundModel.find().exec();
-    return Promise.all(
-      backgrounds.map((background) => this.mapToBackgroundWithData(background)),
-    );
+    return backgrounds.map((background) => this.toMetadata(background));
+  }
+
+  async getFile(fileName: string): Promise<BackgroundFile> {
+    const background = await this.backgroundModel
+      .findOne({ filename: fileName })
+      .exec();
+    if (!background) {
+      throw new NotFoundException(
+        `Background with filename ${fileName} not found`,
+      );
+    }
+
+    const { stream, contentType, contentLength } =
+      await this.fetchObjectStream(fileName);
+
+    return {
+      stream,
+      contentType: contentType ?? background.contentType ?? 'application/octet-stream',
+      contentLength: contentLength ?? background.size,
+    };
   }
 
   async removeByFileName(fileName: string): Promise<void> {
@@ -117,27 +141,9 @@ export class BackgroundsService {
     await this.backgroundModel.deleteOne({ _id: background._id }).exec();
   }
 
-  private async mapToBackgroundWithData(
-    background: BackgroundDocument,
-    preload?: Buffer,
-  ): Promise<BackgroundWithData> {
-    if (!background.filename) {
-      throw new NotFoundException(
-        `Background ${background.id} has no associated image filename`,
-      );
-    }
-
-    const data = preload ?? (await this.fetchObjectBuffer(background.filename));
-
-    return {
-      id: background.id,
-      contentType: background.contentType,
-      filename: background.filename,
-      data,
-    };
-  }
-
-  private async fetchObjectBuffer(filename: string): Promise<Buffer> {
+  private async fetchObjectStream(
+    filename: string,
+  ): Promise<{ stream: Readable; contentType?: string; contentLength?: number }> {
     try {
       const response = await this.s3Client.send(
         new GetObjectCommand({
@@ -150,22 +156,25 @@ export class BackgroundsService {
         throw new NotFoundException('Background image data not found');
       }
 
-      if (Buffer.isBuffer(response.Body)) {
-        return response.Body;
-      }
-
+      let stream: Readable;
       if (response.Body instanceof Readable) {
-        return this.streamToBuffer(response.Body);
-      }
-
-      if (typeof (response.Body as any).transformToByteArray === 'function') {
+        stream = response.Body;
+      } else if (Buffer.isBuffer(response.Body)) {
+        stream = Readable.from(response.Body);
+      } else if (typeof (response.Body as any).transformToByteArray === 'function') {
         const arrayBuffer = await (response.Body as any).transformToByteArray();
-        return Buffer.from(arrayBuffer);
+        stream = Readable.from(Buffer.from(arrayBuffer));
+      } else {
+        throw new InternalServerErrorException(
+          'Unsupported S3 response body type',
+        );
       }
 
-      throw new InternalServerErrorException(
-        'Unsupported S3 response body type',
-      );
+      return {
+        stream,
+        contentType: response.ContentType ?? undefined,
+        contentLength: response.ContentLength ?? undefined,
+      };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -206,16 +215,6 @@ export class BackgroundsService {
     }
   }
 
-  private async streamToBuffer(stream: Readable): Promise<Buffer> {
-    const chunks: Buffer[] = [];
-
-    for await (const chunk of stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-
-    return Buffer.concat(chunks);
-  }
-
   private async generateStoredFilename(): Promise<string> {
     let nextIndex = (await this.backgroundModel.countDocuments().exec()) + 1;
     let candidate = `background${nextIndex}`;
@@ -234,6 +233,19 @@ export class BackgroundsService {
       return detected.mime;
     }
 
+    if (file.mimetype) {
+      return file.mimetype;
+    }
+
     return 'application/octet-stream';
+  }
+
+  private toMetadata(background: BackgroundDocument): BackgroundMetadata {
+    return {
+      id: background.id,
+      contentType: background.contentType,
+      filename: background.filename,
+      size: background.size,
+    };
   }
 }

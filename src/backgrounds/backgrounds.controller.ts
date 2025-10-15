@@ -4,17 +4,20 @@ import {
   Get,
   Param,
   Post,
+  Res,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import {
   BackgroundsService,
-  BackgroundWithData,
+  BackgroundMetadata,
   UploadedImage,
 } from './backgrounds.service';
 import { PasswordProtected } from '../auth/password-protected.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 
 @Controller('backgrounds')
 export class BackgroundsController {
@@ -39,6 +42,23 @@ export class BackgroundsController {
     return backgrounds.map((background) => this.serialize(background));
   }
 
+  @Get(':fileName')
+  async streamByFileName(
+    @Param('fileName') fileName: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const file = await this.backgroundsService.getFile(fileName);
+    res.setHeader('Content-Type', file.contentType);
+    if (file.contentLength !== undefined) {
+      res.setHeader('Content-Length', file.contentLength.toString());
+    }
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${fileName}"`,
+    );
+    return new StreamableFile(file.stream);
+  }
+
   @Delete(':fileName')
   @PasswordProtected()
   async removeByFileName(@Param('fileName') fileName: string) {
@@ -46,12 +66,12 @@ export class BackgroundsController {
     return { message: 'Background deleted successfully' };
   }
 
-  private serialize(background: BackgroundWithData) {
+  private serialize(background: BackgroundMetadata) {
     return {
       id: background.id,
       contentType: background.contentType,
       filename: background.filename,
-      data: background.data.toString('base64'),
+      size: background.size,
     };
   }
 }
