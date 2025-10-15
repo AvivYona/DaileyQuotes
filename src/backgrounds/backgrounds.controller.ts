@@ -13,7 +13,6 @@ import {
   UploadedImage,
 } from './backgrounds.service';
 import { PasswordProtected } from '../auth/password-protected.decorator';
-import { ParseMongoIdPipe } from '../common/pipes/parse-mongo-id.pipe';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
@@ -40,10 +39,10 @@ export class BackgroundsController {
     return backgrounds.map((background) => this.serialize(background));
   }
 
-  @Delete(':id')
+  @Delete(':fileName')
   @PasswordProtected()
-  async remove(@Param('id', ParseMongoIdPipe) id: string) {
-    await this.backgroundsService.remove(id);
+  async removeByFileName(@Param('fileName') fileName: string) {
+    await this.backgroundsService.removeByFileName(fileName);
     return { message: 'Background deleted successfully' };
   }
 
