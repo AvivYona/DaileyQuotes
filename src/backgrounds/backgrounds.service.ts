@@ -13,15 +13,13 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { randomUUID } from 'crypto';
+import { fromBuffer as detectFileTypeFromBuffer } from 'file-type';
 import { Readable } from 'stream';
-import { extname } from 'path';
 import { Background, BackgroundDocument } from '../schemas/background.schema';
 
 interface UploadedImage {
   buffer: Buffer;
-  mimetype: string;
-  originalname: string;
+  mimetype?: string;
 }
 
 export interface BackgroundWithData {
@@ -56,7 +54,8 @@ export class BackgroundsService {
       throw new BadRequestException('Image file is required');
     }
 
-    const filename = await this.generateStoredFilename(file.originalname);
+    const filename = await this.generateStoredFilename();
+    const contentType = await this.detectContentType(file);
 
     try {
       await this.s3Client.send(
@@ -64,7 +63,7 @@ export class BackgroundsService {
           Bucket: this.bucketName,
           Key: filename,
           Body: file.buffer,
-          ContentType: file.mimetype,
+          ContentType: contentType,
         }),
       );
     } catch (error) {
@@ -77,7 +76,7 @@ export class BackgroundsService {
 
     try {
       const createdBackground = new this.backgroundModel({
-        contentType: file.mimetype,
+        contentType,
         filename,
         size: file.buffer.length,
       });
@@ -217,40 +216,28 @@ export class BackgroundsService {
     return Buffer.concat(chunks);
   }
 
-  private async generateStoredFilename(originalName: string): Promise<string> {
-    const normalizedFilename = this.normalizeFilename(originalName);
-    const exists = await this.backgroundModel
-      .exists({ filename: normalizedFilename })
-      .exec();
+  private async generateStoredFilename(): Promise<string> {
+    let nextIndex = (await this.backgroundModel.countDocuments().exec()) + 1;
+    let candidate = `background${nextIndex}`;
 
-    if (!exists) {
-      return normalizedFilename;
+    while (await this.backgroundModel.exists({ filename: candidate }).exec()) {
+      nextIndex += 1;
+      candidate = `background${nextIndex}`;
     }
 
-    const extension = extname(normalizedFilename);
-    const baseName = extension
-      ? normalizedFilename.slice(0, -extension.length)
-      : normalizedFilename;
-
-    return `${baseName}-${randomUUID()}${extension}`;
+    return candidate;
   }
 
-  private normalizeFilename(originalName: string): string {
-    const trimmed = originalName.trim();
-    if (!trimmed) {
-      return `background-${Date.now()}`;
+  private async detectContentType(file: UploadedImage): Promise<string> {
+    const detected = await detectFileTypeFromBuffer(file.buffer);
+    if (detected?.mime) {
+      return detected.mime;
     }
 
-    const extension = extname(trimmed).toLowerCase();
-    const baseName = extension ? trimmed.slice(0, -extension.length) : trimmed;
+    if (file.mimetype) {
+      return file.mimetype;
+    }
 
-    const normalizedBase = baseName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-    const finalBase = normalizedBase || `background-${Date.now()}`;
-    return `${finalBase}${extension}`;
+    return 'application/octet-stream';
   }
-
 }
