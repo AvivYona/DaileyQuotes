@@ -8,7 +8,7 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { Handler } from 'aws-lambda';
 import serverlessExpress from '@vendia/serverless-express';
-import * as express from 'express';
+import express from 'express';
 
 let cachedHandler:
   | Handler<APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2>
@@ -18,6 +18,7 @@ async function bootstrapServer(): Promise<
   Handler<APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2>
 > {
   if (!cachedHandler) {
+    const express = require('express');
     const expressApp = express();
     const nestApp = await NestFactory.create(
       AppModule,
