@@ -47,12 +47,12 @@ export class BackgroundsService {
     @InjectModel(Background.name)
     private readonly backgroundModel: Model<BackgroundDocument>,
   ) {
-    this.bucketName = process.env.AWS_S3_BUCKET ?? '';
+    this.bucketName = process.env.BUCKET ?? '';
     if (!this.bucketName) {
       throw new Error('AWS_S3_BUCKET environment variable is not set');
     }
 
-    const region = process.env.AWS_REGION ?? 'us-east-1';
+    const region = process.env.REGION ?? 'eu-north-1';
 
     this.s3Client = new S3Client({ region });
   }
@@ -121,7 +121,8 @@ export class BackgroundsService {
 
     return {
       stream,
-      contentType: contentType ?? background.contentType ?? 'application/octet-stream',
+      contentType:
+        contentType ?? background.contentType ?? 'application/octet-stream',
       contentLength: contentLength ?? background.size,
     };
   }
@@ -141,9 +142,11 @@ export class BackgroundsService {
     await this.backgroundModel.deleteOne({ _id: background._id }).exec();
   }
 
-  private async fetchObjectStream(
-    filename: string,
-  ): Promise<{ stream: Readable; contentType?: string; contentLength?: number }> {
+  private async fetchObjectStream(filename: string): Promise<{
+    stream: Readable;
+    contentType?: string;
+    contentLength?: number;
+  }> {
     try {
       const response = await this.s3Client.send(
         new GetObjectCommand({
@@ -161,7 +164,9 @@ export class BackgroundsService {
         stream = response.Body;
       } else if (Buffer.isBuffer(response.Body)) {
         stream = Readable.from(response.Body);
-      } else if (typeof (response.Body as any).transformToByteArray === 'function') {
+      } else if (
+        typeof (response.Body as any).transformToByteArray === 'function'
+      ) {
         const arrayBuffer = await (response.Body as any).transformToByteArray();
         stream = Readable.from(Buffer.from(arrayBuffer));
       } else {
