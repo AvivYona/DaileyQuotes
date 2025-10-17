@@ -7,8 +7,8 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { Handler } from 'aws-lambda';
-import serverlessExpress from '@vendia/serverless-express';
-import express from 'express';
+import express = require('express');
+const serverlessExpress = require('@vendia/serverless-express');
 
 let cachedHandler:
   | Handler<APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2>
@@ -18,7 +18,6 @@ async function bootstrapServer(): Promise<
   Handler<APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2>
 > {
   if (!cachedHandler) {
-    const express = require('express');
     const expressApp = express();
     const nestApp = await NestFactory.create(
       AppModule,
@@ -31,9 +30,9 @@ async function bootstrapServer(): Promise<
     nestApp.enableShutdownHooks();
     await nestApp.init();
 
-    cachedHandler = serverlessExpress<APIGatewayProxyEventV2>({
+    cachedHandler = serverlessExpress({
       app: expressApp,
-    });
+    }) as Handler<APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2>;
   }
 
   return cachedHandler;

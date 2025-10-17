@@ -8,4 +8,8 @@ export class CreateQuoteDto {
   @IsString()
   @IsNotEmpty()
   quote: string;
+
+  @IsString()
+  @IsNotEmpty()
+  description: string;
 }
