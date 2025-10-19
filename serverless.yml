@@ -1,0 +1,94 @@
+service: dailey-quotes
+
+frameworkVersion: '^3.0.0'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: eu-north-1
+  profile: emuna
+  environment:
+    MONGODB_URI: ${ssm:/dev/MONGODB_URI}
+    API_PASSWORD: ${ssm:/dev/API_PASSWORD}
+    ADMIN_PASS: ${ssm:/dev/ADMIN_PASS}
+    REGION: eu-north-1
+    BUCKET: emunabuck
+    PORT: 3000
+  iam:
+    role: arn:aws:iam::551566338738:role/emuna-lambda-rule
+
+package:
+  patterns:
+    - '!src/**'
+    - 'dist/**'
+    - 'node_modules/**'
+    - 'package.json'
+    - 'package-lock.json'
+
+functions:
+  api:
+    handler: dist/lambda.handler
+    events:
+      - httpApi:
+          path: /quote
+          method: get
+      - httpApi:
+          path: /background
+          method: get
+      - httpApi:
+          path: /admin/quote
+          method: post
+      - httpApi:
+          path: /admin/quote/{id}
+          method: put
+      - httpApi:
+          path: /admin/quote/{id}
+          method: delete
+      - httpApi:
+          path: /quotes
+          method: get
+      - httpApi:
+          path: /quotes
+          method: post
+      - httpApi:
+          path: /quotes/author/{id}
+          method: get
+      - httpApi:
+          path: /quotes/{id}
+          method: get
+      - httpApi:
+          path: /quotes/{id}
+          method: patch
+      - httpApi:
+          path: /quotes/{id}
+          method: delete
+      - httpApi:
+          path: /backgrounds
+          method: get
+      - httpApi:
+          path: /backgrounds
+          method: post
+      - httpApi:
+          path: /backgrounds/{fileName}
+          method: get
+      - httpApi:
+          path: /backgrounds/{fileName}
+          method: delete
+      - httpApi:
+          path: /authors
+          method: get
+      - httpApi:
+          path: /authors
+          method: post
+      - httpApi:
+          path: /authors/{id}
+          method: get
+      - httpApi:
+          path: /authors/{id}
+          method: patch
+      - httpApi:
+          path: /authors/{id}
+          method: delete
+      - httpApi:
+          path: /admin/verify
+          method: post

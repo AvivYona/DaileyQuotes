@@ -11,6 +11,9 @@ export class Quote {
 
   @Prop({ required: true })
   quote: string;
+
+  @Prop({ required: true })
+  description: string;
 }
 
 export const QuoteSchema = SchemaFactory.createForClass(Quote);
