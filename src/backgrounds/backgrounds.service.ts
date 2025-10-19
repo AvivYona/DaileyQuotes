@@ -52,7 +52,7 @@ export class BackgroundsService {
       throw new Error('AWS_S3_BUCKET environment variable is not set');
     }
 
-    const region = process.env.REGION ?? 'eu-north-1';
+    const region = process.env.REGION ?? 'il-central-1';
 
     this.s3Client = new S3Client({ region });
   }

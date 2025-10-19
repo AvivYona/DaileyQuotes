@@ -5,14 +5,13 @@ frameworkVersion: '^3.0.0'
 provider:
   name: aws
   runtime: nodejs20.x
-  region: eu-north-1
+  region: il-central-1
   profile: emuna
   environment:
     MONGODB_URI: ${ssm:/dev/MONGODB_URI}
     API_PASSWORD: ${ssm:/dev/API_PASSWORD}
-    ADMIN_PASS: ${ssm:/dev/ADMIN_PASS}
-    REGION: eu-north-1
-    BUCKET: emunabuck
+    REGION: il-central-1
+    BUCKET: emunabuckil
     PORT: 3000
   iam:
     role: arn:aws:iam::551566338738:role/emuna-lambda-rule
@@ -89,6 +88,3 @@ functions:
       - httpApi:
           path: /authors/{id}
           method: delete
-      - httpApi:
-          path: /admin/verify
-          method: post
