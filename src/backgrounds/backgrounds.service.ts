@@ -28,6 +28,7 @@ export interface BackgroundMetadata {
   id: string;
   contentType: string;
   filename: string;
+  clean: boolean;
   size?: number;
 }
 
@@ -57,7 +58,10 @@ export class BackgroundsService {
     this.s3Client = new S3Client({ region });
   }
 
-  async create(file: UploadedImage | undefined): Promise<BackgroundMetadata> {
+  async create(
+    clean: boolean,
+    file: UploadedImage | undefined,
+  ): Promise<BackgroundMetadata> {
     if (!file) {
       throw new BadRequestException('Image file is required');
     }
@@ -86,6 +90,7 @@ export class BackgroundsService {
       const createdBackground = new this.backgroundModel({
         contentType,
         filename,
+        clean,
         size: file.buffer.length,
       });
 
@@ -103,6 +108,13 @@ export class BackgroundsService {
 
   async findAll(): Promise<BackgroundMetadata[]> {
     const backgrounds = await this.backgroundModel.find().exec();
+    return backgrounds.map((background) => this.toMetadata(background));
+  }
+
+  async findClean(): Promise<BackgroundMetadata[]> {
+    const backgrounds = await this.backgroundModel
+      .find({ clean: true })
+      .exec();
     return backgrounds.map((background) => this.toMetadata(background));
   }
 
@@ -250,6 +262,7 @@ export class BackgroundsService {
       id: background.id,
       contentType: background.contentType,
       filename: background.filename,
+      clean: Boolean(background.clean),
       size: background.size,
     };
   }
