@@ -6,6 +6,7 @@ import {
   BadRequestException,
   Param,
   Post,
+  Patch,
   Res,
   StreamableFile,
   UploadedFile,
@@ -48,10 +49,30 @@ export class BackgroundsController {
     return backgrounds.map((background) => this.serialize(background));
   }
 
+  @Get('notClean')
+  async findNotClean() {
+    const backgrounds = await this.backgroundsService.findByClean(false);
+    return backgrounds.map((background) => this.serialize(background));
+  }
+
   @Get('clean')
   async findClean() {
-    const backgrounds = await this.backgroundsService.findClean();
+    const backgrounds = await this.backgroundsService.findByClean(true);
     return backgrounds.map((background) => this.serialize(background));
+  }
+
+  @Patch(':fileName/clean')
+  @PasswordProtected()
+  async updateClean(
+    @Param('fileName') fileName: string,
+    @Body('clean') cleanValue?: string | boolean,
+  ) {
+    const clean = this.parseCleanFlag(cleanValue);
+    const background = await this.backgroundsService.updateCleanByFileName(
+      fileName,
+      clean,
+    );
+    return this.serialize(background);
   }
 
   @Get(':fileName')
@@ -64,10 +85,7 @@ export class BackgroundsController {
     if (file.contentLength !== undefined) {
       res.setHeader('Content-Length', file.contentLength.toString());
     }
-    res.setHeader(
-      'Content-Disposition',
-      `inline; filename="${fileName}"`,
-    );
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
     return new StreamableFile(file.stream);
   }
 

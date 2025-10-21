@@ -111,11 +111,32 @@ export class BackgroundsService {
     return backgrounds.map((background) => this.toMetadata(background));
   }
 
-  async findClean(): Promise<BackgroundMetadata[]> {
+  async findByClean(clean: boolean): Promise<BackgroundMetadata[]> {
     const backgrounds = await this.backgroundModel
-      .find({ clean: true })
+      .find({ clean: clean })
       .exec();
     return backgrounds.map((background) => this.toMetadata(background));
+  }
+
+  async updateCleanByFileName(
+    fileName: string,
+    clean: boolean,
+  ): Promise<BackgroundMetadata> {
+    const updatedBackground = await this.backgroundModel
+      .findOneAndUpdate(
+        { filename: fileName },
+        { clean },
+        { new: true },
+      )
+      .exec();
+
+    if (!updatedBackground) {
+      throw new NotFoundException(
+        `Background with filename ${fileName} not found`,
+      );
+    }
+
+    return this.toMetadata(updatedBackground);
   }
 
   async getFile(fileName: string): Promise<BackgroundFile> {
