@@ -28,6 +28,11 @@ export class QuotesController {
     return this.quotesService.findAll();
   }
 
+  @Get('random')
+  findRandom() {
+    return this.quotesService.findRandom();
+  }
+
   @Get('/author/:id')
   findByAuthor(@Param('id', ParseMongoIdPipe) authorId: string) {
     return this.quotesService.findByAuthor(authorId);

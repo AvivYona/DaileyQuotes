@@ -44,6 +44,27 @@ export class QuotesService {
       .exec();
   }
 
+  async findRandom(): Promise<Quote> {
+    const totalQuotes = await this.quoteModel.countDocuments().exec();
+    if (totalQuotes === 0) {
+      throw new NotFoundException('No quotes found');
+    }
+
+    const randomIndex = Math.floor(Math.random() * totalQuotes);
+    const randomQuote = await this.quoteModel
+      .findOne()
+      .skip(randomIndex)
+      .populate('author', 'name')
+      .lean()
+      .exec();
+
+    if (!randomQuote) {
+      throw new NotFoundException('No quotes found');
+    }
+
+    return randomQuote;
+  }
+
   async findOne(id: string): Promise<Quote> {
     const quote = await this.quoteModel
       .findById(id)

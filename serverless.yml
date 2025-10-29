@@ -47,6 +47,9 @@ functions:
           path: /quotes
           method: get
       - httpApi:
+          path: /quotes/random
+          method: get
+      - httpApi:
           path: /quotes
           method: post
       - httpApi:
@@ -65,11 +68,20 @@ functions:
           path: /backgrounds
           method: get
       - httpApi:
+          path: /backgrounds/notClean
+          method: get
+      - httpApi:
+          path: /backgrounds/clean
+          method: get
+      - httpApi:
           path: /backgrounds
           method: post
       - httpApi:
           path: /backgrounds/{fileName}
           method: get
+      - httpApi:
+          path: /backgrounds/{fileName}/clean
+          method: patch
       - httpApi:
           path: /backgrounds/{fileName}
           method: delete
