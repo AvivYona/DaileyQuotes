@@ -100,3 +100,14 @@ functions:
       - httpApi:
           path: /authors/{id}
           method: delete
+  saveUserPush:
+    handler: dist/handlers/saveUserPush.handler
+    events:
+      - http:
+          path: save-user-push
+          method: post
+          cors: true
+  sendScheduledPushes:
+    handler: dist/handlers/sendScheduledPushes.handler
+    events:
+      - schedule: cron(0/1 7-23 * * ? *)
