@@ -110,4 +110,4 @@ functions:
   sendScheduledPushes:
     handler: dist/handlers/sendScheduledPushes.handler
     events:
-      - schedule: cron(0/1 7-23 * * ? *)
+      - schedule: cron(0/1 * * * ? *)

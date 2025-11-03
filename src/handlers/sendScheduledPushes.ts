@@ -16,6 +16,11 @@ type LocalTimeSnapshot = {
   weekday: number; // 0 = Sunday ... 6 = Saturday
 };
 
+type ShabbatWindow = {
+  start: Date;
+  end: Date;
+};
+
 const weekdayMap: Record<string, number> = {
   Sun: 0,
   Mon: 1,
@@ -71,14 +76,106 @@ const toLocalTimeSnapshot = (
   }
 };
 
-const isDuringShabbat = ({ weekday, hour }: LocalTimeSnapshot): boolean => {
-  if (weekday === 5 && hour >= 16) {
-    return true;
+const shabbatWindowCache = new Map<
+  string,
+  { window: ShabbatWindow | null; expiresAt: number }
+>();
+
+const SHABBAT_CACHE_FALLBACK_MS = 60 * 60 * 1000; // 1 hour
+
+const isWithinWindow = (window: ShabbatWindow, timestamp: number): boolean => {
+  const start = window.start.getTime();
+  const end = window.end.getTime();
+  return timestamp >= start && timestamp < end;
+};
+
+const fetchShabbatWindow = async (
+  timeZone: string,
+): Promise<ShabbatWindow | null> => {
+  try {
+    const url = new URL('https://www.hebcal.com/shabbat');
+    url.searchParams.set('cfg', 'json');
+    url.searchParams.set('tzid', timeZone);
+    url.searchParams.set('m', '50');
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      console.error(
+        `Hebcal shabbat request failed with status ${response.status} for tz ${timeZone}`,
+      );
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      items?: Array<{ category?: string; date?: string }>;
+    };
+
+    if (!Array.isArray(data.items)) {
+      return null;
+    }
+
+    for (let index = 0; index < data.items.length; index += 1) {
+      const item = data.items[index];
+      if (item?.category !== 'candles' || typeof item.date !== 'string') {
+        continue;
+      }
+
+      const start = new Date(item.date);
+      if (Number.isNaN(start.getTime())) {
+        continue;
+      }
+
+      const havdalahItem = data.items
+        .slice(index + 1)
+        .find(
+          (entry) =>
+            entry?.category === 'havdalah' && typeof entry.date === 'string',
+        );
+
+      if (!havdalahItem) {
+        continue;
+      }
+
+      const end = new Date(havdalahItem.date);
+      if (Number.isNaN(end.getTime())) {
+        continue;
+      }
+
+      return { start, end };
+    }
+
+    return null;
+  } catch (error) {
+    console.error(
+      `Failed to fetch shabbat window from Hebcal for tz ${timeZone}`,
+      error,
+    );
+    return null;
   }
-  if (weekday === 6 && hour < 20) {
-    return true;
+};
+
+const isDuringShabbat = async (
+  timeZone: string,
+  referenceDate = new Date(),
+): Promise<boolean> => {
+  const timestamp = referenceDate.getTime();
+  const cached = shabbatWindowCache.get(timeZone);
+
+  if (cached && timestamp < cached.expiresAt) {
+    return cached.window ? isWithinWindow(cached.window, timestamp) : false;
   }
-  return false;
+
+  const window = await fetchShabbatWindow(timeZone);
+  let expiresAt = timestamp + SHABBAT_CACHE_FALLBACK_MS;
+
+  if (window) {
+    const beforeStart = timestamp < window.start.getTime();
+    expiresAt = beforeStart ? window.start.getTime() : window.end.getTime();
+  }
+
+  shabbatWindowCache.set(timeZone, { window, expiresAt });
+
+  return window ? isWithinWindow(window, timestamp) : false;
 };
 
 type QuoteForPush = {
@@ -206,13 +303,10 @@ const shouldSendNow = (
   snapshot: LocalTimeSnapshot,
   targetHour: number,
   targetMinute: number,
+  referenceDate: Date,
   lastSentAt?: Date,
 ): boolean => {
   if (snapshot.hour !== targetHour || snapshot.minute !== targetMinute) {
-    return false;
-  }
-
-  if (isDuringShabbat(snapshot)) {
     return false;
   }
 
@@ -220,7 +314,7 @@ const shouldSendNow = (
     return true;
   }
 
-  const diffMs = Date.now() - lastSentAt.getTime();
+  const diffMs = referenceDate.getTime() - lastSentAt.getTime();
   return diffMs >= 60_000;
 };
 
@@ -234,7 +328,8 @@ export const handler: ScheduledHandler = async () => {
     const quotesService = await getQuotesService();
 
     for (const device of devices) {
-      const snapshot = toLocalTimeSnapshot(device.timeZone);
+      const referenceDate = new Date();
+      const snapshot = toLocalTimeSnapshot(device.timeZone, referenceDate);
       if (!snapshot) {
         continue;
       }
@@ -246,7 +341,19 @@ export const handler: ScheduledHandler = async () => {
             ? new Date(device.lastSentAt)
             : undefined;
 
-      if (!shouldSendNow(snapshot, device.hour, device.minute, lastSentAt)) {
+      if (
+        !shouldSendNow(
+          snapshot,
+          device.hour,
+          device.minute,
+          referenceDate,
+          lastSentAt,
+        )
+      ) {
+        continue;
+      }
+
+      if (await isDuringShabbat(device.timeZone, referenceDate)) {
         continue;
       }
 
