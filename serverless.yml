@@ -13,6 +13,8 @@ provider:
     REGION: il-central-1
     BUCKET: emunabuckil
     PORT: 3000
+    GOOGLE_CLIENT_IDS: ${ssm:/dev/GOOGLE_CLIENT_IDS}
+    APPLE_CLIENT_IDS: ${ssm:/dev/APPLE_CLIENT_IDS}
   iam:
     role: arn:aws:iam::551566338738:role/emuna-lambda-rule
 

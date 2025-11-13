@@ -1,10 +1,7 @@
 import { ScheduledHandler } from 'aws-lambda';
 import mongoose, { Model, Types } from 'mongoose';
-import {
-  listPushSettings,
-  updateLastSentAt,
-} from '../push/device-push-settings.service';
-import { DevicePushSettingDocument } from '../schemas/device-push-setting.schema';
+import { listUsers, recordQuoteDelivery } from '../users/users.service';
+import { UserDocument } from '../schemas/user.schema';
 import { Quote, QuoteDocument, QuoteSchema } from '../schemas/quote.schema';
 import { Author, AuthorDocument, AuthorSchema } from '../schemas/author.schema';
 import { QuotesService } from '../quotes/quotes.service';
@@ -190,6 +187,8 @@ type QuoteForPush = {
 
 let cachedQuotesService: QuotesService | null = null;
 
+const MAX_QUOTE_SELECTION_ATTEMPTS = 5;
+
 const getQuotesService = async (): Promise<QuotesService> => {
   if (cachedQuotesService) {
     return cachedQuotesService;
@@ -245,6 +244,54 @@ const mapQuoteForPush = (quote: any): QuoteForPush => {
     description: quote.description ?? '',
     author,
   };
+};
+
+const toObjectIdString = (value: unknown): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (value instanceof Types.ObjectId) {
+    return value.toHexString();
+  }
+
+  if (typeof value === 'object' && '_id' in (value as Record<string, unknown>)) {
+    const nested = (value as { _id?: unknown })._id;
+    return toObjectIdString(nested);
+  }
+
+  return null;
+};
+
+const pickQuoteWithExclusions = async (
+  quotesService: QuotesService,
+  excludedIds: Set<string>,
+): Promise<Quote | null> => {
+  let fallbackQuote: Quote | null = null;
+
+  for (
+    let attempt = 0;
+    attempt < MAX_QUOTE_SELECTION_ATTEMPTS;
+    attempt += 1
+  ) {
+    const candidate = await quotesService.findRandom();
+    fallbackQuote = candidate;
+
+    const candidateId = toObjectIdString((candidate as any)?._id);
+    if (!candidateId) {
+      return candidate;
+    }
+
+    if (!excludedIds.has(candidateId)) {
+      return candidate;
+    }
+  }
+
+  return fallbackQuote;
 };
 
 const sendExpoNotification = async (
@@ -320,64 +367,149 @@ const shouldSendNow = (
 
 export const handler: ScheduledHandler = async () => {
   try {
-    const devices: DevicePushSettingDocument[] = await listPushSettings();
-    if (!devices.length) {
+    const users: UserDocument[] = await listUsers();
+    if (!users.length) {
       return;
     }
 
     const quotesService = await getQuotesService();
 
-    for (const device of devices) {
+    for (const user of users) {
+      if (!user.timeZone || !Array.isArray(user.notificationSchedule)) {
+        continue;
+      }
+
+      if (!Array.isArray(user.devices) || user.devices.length === 0) {
+        continue;
+      }
+
       const referenceDate = new Date();
-      const snapshot = toLocalTimeSnapshot(device.timeZone, referenceDate);
+      const snapshot = toLocalTimeSnapshot(user.timeZone, referenceDate);
       if (!snapshot) {
         continue;
       }
 
-      const lastSentAt =
-        device.lastSentAt instanceof Date
-          ? device.lastSentAt
-          : device.lastSentAt
-            ? new Date(device.lastSentAt)
-            : undefined;
-
-      if (
-        !shouldSendNow(
-          snapshot,
-          device.hour,
-          device.minute,
-          referenceDate,
-          lastSentAt,
-        )
-      ) {
+      if (await isDuringShabbat(user.timeZone, referenceDate)) {
         continue;
       }
 
-      if (await isDuringShabbat(device.timeZone, referenceDate)) {
-        continue;
+      const runtimeUsedQuoteIds = new Set<string>();
+
+      for (const schedule of user.notificationSchedule) {
+        if (typeof schedule?.hour !== 'number' || typeof schedule?.minute !== 'number') {
+          continue;
+        }
+
+        const lastSentAt =
+          schedule.lastSentAt instanceof Date
+            ? schedule.lastSentAt
+            : schedule.lastSentAt
+              ? new Date(schedule.lastSentAt)
+              : undefined;
+
+        if (
+          !shouldSendNow(
+            snapshot,
+            schedule.hour,
+            schedule.minute,
+            referenceDate,
+            lastSentAt,
+          )
+        ) {
+          continue;
+        }
+
+        const excludedQuoteIds = new Set<string>(runtimeUsedQuoteIds);
+        for (const entry of user.currentQuotes ?? []) {
+          if (
+            typeof entry?.hour !== 'number' ||
+            typeof entry?.minute !== 'number'
+          ) {
+            continue;
+          }
+
+          if (
+            entry.hour === schedule.hour &&
+            entry.minute === schedule.minute
+          ) {
+            continue;
+          }
+
+          const entryQuoteId = toObjectIdString(entry.quoteId);
+          if (entryQuoteId) {
+            excludedQuoteIds.add(entryQuoteId);
+          }
+        }
+
+        const quoteDocument = await pickQuoteWithExclusions(
+          quotesService,
+          excludedQuoteIds,
+        );
+        if (!quoteDocument) {
+          continue;
+        }
+
+        const quote = mapQuoteForPush(quoteDocument);
+        if (!quote.quote) {
+          continue;
+        }
+        const quoteIdString = toObjectIdString((quoteDocument as any)?._id);
+
+        let delivered = false;
+        for (const device of user.devices) {
+          if (!device?.expoPushToken) {
+            continue;
+          }
+
+          const success = await sendExpoNotification(
+            device.expoPushToken,
+            quote,
+          );
+          delivered = delivered || success;
+        }
+
+        if (!delivered) {
+          continue;
+        }
+
+        const id =
+          user._id instanceof Types.ObjectId
+            ? user._id
+            : new Types.ObjectId(String(user._id));
+
+        if (!quoteIdString) {
+          continue;
+        }
+
+        runtimeUsedQuoteIds.add(quoteIdString);
+        const deliveryTimestamp = new Date();
+        await recordQuoteDelivery(
+          id,
+          schedule.hour,
+          schedule.minute,
+          quoteIdString,
+          deliveryTimestamp,
+        );
+
+        if (!Array.isArray(user.currentQuotes)) {
+          user.currentQuotes = [];
+        }
+
+        user.currentQuotes = user.currentQuotes.filter(
+          (entry) =>
+            !(
+              entry?.hour === schedule.hour &&
+              entry?.minute === schedule.minute
+            ),
+        );
+
+        user.currentQuotes.push({
+          hour: schedule.hour,
+          minute: schedule.minute,
+          quoteId: quoteIdString,
+          sentAt: deliveryTimestamp,
+        } as any);
       }
-
-      const quoteDocument = await quotesService.findRandom();
-      if (!quoteDocument) {
-        continue;
-      }
-
-      const quote = mapQuoteForPush(quoteDocument);
-      if (!quote.quote) {
-        continue;
-      }
-
-      const success = await sendExpoNotification(device.expoPushToken, quote);
-      if (!success) {
-        continue;
-      }
-
-      const id =
-        device._id instanceof Types.ObjectId
-          ? device._id
-          : new Types.ObjectId(String(device._id));
-
-      await updateLastSentAt(id, new Date());
     }
   } catch (error) {
     console.error('Failed to process scheduled pushes', error);
