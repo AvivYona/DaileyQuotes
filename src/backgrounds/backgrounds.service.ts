@@ -28,6 +28,7 @@ export interface BackgroundMetadata {
   id: string;
   contentType: string;
   filename: string;
+  clean: boolean;
   size?: number;
 }
 
@@ -52,12 +53,15 @@ export class BackgroundsService {
       throw new Error('AWS_S3_BUCKET environment variable is not set');
     }
 
-    const region = process.env.REGION ?? 'eu-north-1';
+    const region = process.env.REGION ?? 'il-central-1';
 
     this.s3Client = new S3Client({ region });
   }
 
-  async create(file: UploadedImage | undefined): Promise<BackgroundMetadata> {
+  async create(
+    clean: boolean,
+    file: UploadedImage | undefined,
+  ): Promise<BackgroundMetadata> {
     if (!file) {
       throw new BadRequestException('Image file is required');
     }
@@ -86,6 +90,7 @@ export class BackgroundsService {
       const createdBackground = new this.backgroundModel({
         contentType,
         filename,
+        clean,
         size: file.buffer.length,
       });
 
@@ -104,6 +109,34 @@ export class BackgroundsService {
   async findAll(): Promise<BackgroundMetadata[]> {
     const backgrounds = await this.backgroundModel.find().exec();
     return backgrounds.map((background) => this.toMetadata(background));
+  }
+
+  async findByClean(clean: boolean): Promise<BackgroundMetadata[]> {
+    const backgrounds = await this.backgroundModel
+      .find({ clean: clean })
+      .exec();
+    return backgrounds.map((background) => this.toMetadata(background));
+  }
+
+  async updateCleanByFileName(
+    fileName: string,
+    clean: boolean,
+  ): Promise<BackgroundMetadata> {
+    const updatedBackground = await this.backgroundModel
+      .findOneAndUpdate(
+        { filename: fileName },
+        { clean },
+        { new: true },
+      )
+      .exec();
+
+    if (!updatedBackground) {
+      throw new NotFoundException(
+        `Background with filename ${fileName} not found`,
+      );
+    }
+
+    return this.toMetadata(updatedBackground);
   }
 
   async getFile(fileName: string): Promise<BackgroundFile> {
@@ -250,6 +283,7 @@ export class BackgroundsService {
       id: background.id,
       contentType: background.contentType,
       filename: background.filename,
+      clean: Boolean(background.clean),
       size: background.size,
     };
   }

@@ -11,6 +11,9 @@ export class Background {
   @Prop({ required: true })
   filename: string;
 
+  @Prop({ type: Boolean, default: false })
+  clean: boolean;
+
   @Prop()
   size?: number;
 }
