@@ -9,6 +9,7 @@ import { Quote, QuoteDocument, QuoteSchema } from '../schemas/quote.schema';
 import { Author, AuthorDocument, AuthorSchema } from '../schemas/author.schema';
 import { QuotesService } from '../quotes/quotes.service';
 import { connectToDatabase } from '../database/connection';
+import { isShabbatOrYomTov } from '../common/shabbat-restriction';
 
 type LocalTimeSnapshot = {
   hour: number;
@@ -187,6 +188,12 @@ const shouldSendNow = (
 
 export const handler: ScheduledHandler = async () => {
   try {
+    const restriction = await isShabbatOrYomTov();
+    if (restriction) {
+      console.log(`Skipping push notifications: ${restriction.reason} (${restriction.title})`);
+      return;
+    }
+
     const devices: DevicePushSettingDocument[] = await listPushSettings();
     if (!devices.length) {
       return;
