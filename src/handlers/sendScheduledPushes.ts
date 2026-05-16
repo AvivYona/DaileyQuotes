@@ -13,22 +13,6 @@ import { connectToDatabase } from '../database/connection';
 type LocalTimeSnapshot = {
   hour: number;
   minute: number;
-  weekday: number; // 0 = Sunday ... 6 = Saturday
-};
-
-type ShabbatWindow = {
-  start: Date;
-  end: Date;
-};
-
-const weekdayMap: Record<string, number> = {
-  Sun: 0,
-  Mon: 1,
-  Tue: 2,
-  Wed: 3,
-  Thu: 4,
-  Fri: 5,
-  Sat: 6,
 };
 
 const toLocalTimeSnapshot = (
@@ -36,147 +20,30 @@ const toLocalTimeSnapshot = (
   referenceDate = new Date(),
 ): LocalTimeSnapshot | null => {
   try {
-    const formatter = new Intl.DateTimeFormat('en-US', {
+    const parts = new Intl.DateTimeFormat('en-US', {
       timeZone,
       hour12: false,
-      weekday: 'short',
       hour: '2-digit',
       minute: '2-digit',
-    });
+    }).formatToParts(referenceDate);
 
-    const parts = formatter.formatToParts(referenceDate);
     const hourPart = parts.find((p) => p.type === 'hour')?.value;
     const minutePart = parts.find((p) => p.type === 'minute')?.value;
-    const weekdayPart = parts.find((p) => p.type === 'weekday')?.value;
 
-    if (
-      hourPart === undefined ||
-      minutePart === undefined ||
-      weekdayPart === undefined
-    ) {
-      return null;
-    }
-
-    const weekday = weekdayMap[weekdayPart];
-    if (weekday === undefined) {
+    if (hourPart === undefined || minutePart === undefined) {
       return null;
     }
 
     return {
       hour: Number.parseInt(hourPart, 10),
       minute: Number.parseInt(minutePart, 10),
-      weekday,
     };
   } catch (error) {
-    console.error(
-      `Failed to compute local time for timezone ${timeZone}`,
-      error,
-    );
+    console.error(`Failed to compute local time for timezone ${timeZone}`, error);
     return null;
   }
 };
 
-const shabbatWindowCache = new Map<
-  string,
-  { window: ShabbatWindow | null; expiresAt: number }
->();
-
-const SHABBAT_CACHE_FALLBACK_MS = 60 * 60 * 1000; // 1 hour
-
-const isWithinWindow = (window: ShabbatWindow, timestamp: number): boolean => {
-  const start = window.start.getTime();
-  const end = window.end.getTime();
-  return timestamp >= start && timestamp < end;
-};
-
-const fetchShabbatWindow = async (
-  timeZone: string,
-): Promise<ShabbatWindow | null> => {
-  try {
-    const url = new URL('https://www.hebcal.com/shabbat');
-    url.searchParams.set('cfg', 'json');
-    url.searchParams.set('tzid', timeZone);
-    url.searchParams.set('m', '50');
-
-    const response = await fetch(url.toString());
-    if (!response.ok) {
-      console.error(
-        `Hebcal shabbat request failed with status ${response.status} for tz ${timeZone}`,
-      );
-      return null;
-    }
-
-    const data = (await response.json()) as {
-      items?: Array<{ category?: string; date?: string }>;
-    };
-
-    if (!Array.isArray(data.items)) {
-      return null;
-    }
-
-    for (let index = 0; index < data.items.length; index += 1) {
-      const item = data.items[index];
-      if (item?.category !== 'candles' || typeof item.date !== 'string') {
-        continue;
-      }
-
-      const start = new Date(item.date);
-      if (Number.isNaN(start.getTime())) {
-        continue;
-      }
-
-      const havdalahItem = data.items
-        .slice(index + 1)
-        .find(
-          (entry) =>
-            entry?.category === 'havdalah' && typeof entry.date === 'string',
-        );
-
-      if (!havdalahItem) {
-        continue;
-      }
-
-      const end = new Date(havdalahItem.date);
-      if (Number.isNaN(end.getTime())) {
-        continue;
-      }
-
-      return { start, end };
-    }
-
-    return null;
-  } catch (error) {
-    console.error(
-      `Failed to fetch shabbat window from Hebcal for tz ${timeZone}`,
-      error,
-    );
-    return null;
-  }
-};
-
-const isDuringShabbat = async (
-  timeZone: string,
-  referenceDate = new Date(),
-): Promise<boolean> => {
-  const timestamp = referenceDate.getTime();
-  const cached = shabbatWindowCache.get(timeZone);
-
-  if (cached && timestamp < cached.expiresAt) {
-    return cached.window ? isWithinWindow(cached.window, timestamp) : false;
-  }
-
-  const window = await fetchShabbatWindow(timeZone);
-  let expiresAt = timestamp + SHABBAT_CACHE_FALLBACK_MS;
-
-  if (window) {
-    const beforeStart = timestamp < window.start.getTime();
-    expiresAt = beforeStart ? window.start.getTime() : window.end.getTime();
-  }
-
-  shabbatWindowCache.set(timeZone, { window, expiresAt });
-
-  return window ? isWithinWindow(window, timestamp) : false;
-};
 
 type QuoteForPush = {
   _id: string;
@@ -353,10 +220,6 @@ export const handler: ScheduledHandler = async () => {
         continue;
       }
 
-      if (await isDuringShabbat(device.timeZone, referenceDate)) {
-        console.log(`Skipping ${device.expoPushToken} - Shabbat`);
-        continue;
-      }
 
       const quoteDocument = await quotesService.findRandom();
       if (!quoteDocument) {
