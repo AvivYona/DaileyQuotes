@@ -354,6 +354,7 @@ export const handler: ScheduledHandler = async () => {
       }
 
       if (await isDuringShabbat(device.timeZone, referenceDate)) {
+        console.log(`Skipping ${device.expoPushToken} - Shabbat`);
         continue;
       }
 
