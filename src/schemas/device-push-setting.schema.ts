@@ -25,4 +25,3 @@ export const DevicePushSettingSchema = new Schema<DevicePushSettingDocument>(
   },
 );
 
-DevicePushSettingSchema.index({ expoPushToken: 1 }, { unique: true });
