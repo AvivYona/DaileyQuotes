@@ -62,6 +62,67 @@ export const listPushSettings = async () => {
   return model.find().exec();
 };
 
+export const getDistinctTimeZones = async (): Promise<string[]> => {
+  await connectToDatabase();
+  const model = getModel();
+  return model.distinct('timeZone').exec();
+};
+
+const toLocalTimeSnapshot = (
+  timeZone: string,
+  referenceDate: Date,
+): { hour: number; minute: number } | null => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(referenceDate);
+
+    const hourPart = parts.find((p) => p.type === 'hour')?.value;
+    const minutePart = parts.find((p) => p.type === 'minute')?.value;
+
+    if (hourPart === undefined || minutePart === undefined) {
+      return null;
+    }
+
+    // en-US returns "24" for midnight; normalize to 0.
+    const hour = Number.parseInt(hourPart, 10) % 24;
+    return {
+      hour,
+      minute: Number.parseInt(minutePart, 10),
+    };
+  } catch (error) {
+    console.error(`Failed to compute local time for timezone ${timeZone}`, error);
+    return null;
+  }
+};
+
+export const listPushSettingsDue = async (
+  referenceDate: Date = new Date(),
+): Promise<DevicePushSettingDocument[]> => {
+  await connectToDatabase();
+  const model = getModel();
+
+  const timeZones = (await model.distinct('timeZone').exec()) as string[];
+  if (!timeZones.length) return [];
+
+  const conditions: { timeZone: string; hour: number; minute: number }[] = [];
+  for (const timeZone of timeZones) {
+    const snapshot = toLocalTimeSnapshot(timeZone, referenceDate);
+    if (!snapshot) continue;
+    conditions.push({
+      timeZone,
+      hour: snapshot.hour,
+      minute: snapshot.minute,
+    });
+  }
+
+  if (!conditions.length) return [];
+  return model.find({ $or: conditions }).exec();
+};
+
 export const updateLastSentAt = async (
   id: mongoose.Types.ObjectId,
   timestamp: Date,

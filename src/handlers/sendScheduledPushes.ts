@@ -1,7 +1,7 @@
 import { ScheduledHandler } from 'aws-lambda';
 import mongoose, { Model, Types } from 'mongoose';
 import {
-  listPushSettings,
+  listPushSettingsDue,
   updateLastSentAt,
 } from '../push/device-push-settings.service';
 import { DevicePushSettingDocument } from '../schemas/device-push-setting.schema';
@@ -10,41 +10,6 @@ import { Author, AuthorDocument, AuthorSchema } from '../schemas/author.schema';
 import { QuotesService } from '../quotes/quotes.service';
 import { connectToDatabase } from '../database/connection';
 import { isShabbatOrYomTov } from '../common/shabbat-restriction';
-
-type LocalTimeSnapshot = {
-  hour: number;
-  minute: number;
-};
-
-const toLocalTimeSnapshot = (
-  timeZone: string,
-  referenceDate = new Date(),
-): LocalTimeSnapshot | null => {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-    }).formatToParts(referenceDate);
-
-    const hourPart = parts.find((p) => p.type === 'hour')?.value;
-    const minutePart = parts.find((p) => p.type === 'minute')?.value;
-
-    if (hourPart === undefined || minutePart === undefined) {
-      return null;
-    }
-
-    return {
-      hour: Number.parseInt(hourPart, 10),
-      minute: Number.parseInt(minutePart, 10),
-    };
-  } catch (error) {
-    console.error(`Failed to compute local time for timezone ${timeZone}`, error);
-    return null;
-  }
-};
-
 
 type QuoteForPush = {
   _id: string;
@@ -167,34 +132,17 @@ const sendExpoNotification = async (
   }
 };
 
-const shouldSendNow = (
-  snapshot: LocalTimeSnapshot,
-  targetHour: number,
-  targetMinute: number,
-  referenceDate: Date,
-  lastSentAt?: Date,
-): boolean => {
-  if (snapshot.hour !== targetHour || snapshot.minute !== targetMinute) {
-    return false;
-  }
-
-  if (!lastSentAt) {
-    return true;
-  }
-
-  const diffMs = referenceDate.getTime() - lastSentAt.getTime();
-  return diffMs >= 60_000;
-};
 
 export const handler: ScheduledHandler = async () => {
   try {
     const restriction = await isShabbatOrYomTov();
+    console.log(`Shabbat/Yom Tov restriction: ${restriction ? restriction.title : 'none'}`);
     if (restriction) {
-      console.log(`Skipping push notifications: ${restriction.reason} (${restriction.title})`);
       return;
     }
 
-    const devices: DevicePushSettingDocument[] = await listPushSettings();
+    const now = new Date();
+    const devices: DevicePushSettingDocument[] = await listPushSettingsDue(now);
     if (!devices.length) {
       return;
     }
@@ -202,12 +150,6 @@ export const handler: ScheduledHandler = async () => {
     const quotesService = await getQuotesService();
 
     for (const device of devices) {
-      const referenceDate = new Date();
-      const snapshot = toLocalTimeSnapshot(device.timeZone, referenceDate);
-      if (!snapshot) {
-        continue;
-      }
-
       const lastSentAt =
         device.lastSentAt instanceof Date
           ? device.lastSentAt
@@ -215,15 +157,7 @@ export const handler: ScheduledHandler = async () => {
             ? new Date(device.lastSentAt)
             : undefined;
 
-      if (
-        !shouldSendNow(
-          snapshot,
-          device.hour,
-          device.minute,
-          referenceDate,
-          lastSentAt,
-        )
-      ) {
+      if (lastSentAt && now.getTime() - lastSentAt.getTime() < 60_000) {
         continue;
       }
 
@@ -238,17 +172,10 @@ export const handler: ScheduledHandler = async () => {
         continue;
       }
 
-      const success = await sendExpoNotification(device.expoPushToken, quote);
-      if (!success) {
-        continue;
+      const sent = await sendExpoNotification(device.expoPushToken, quote);
+      if (sent) {
+        await updateLastSentAt(device._id as Types.ObjectId, now);
       }
-
-      const id =
-        device._id instanceof Types.ObjectId
-          ? device._id
-          : new Types.ObjectId(String(device._id));
-
-      await updateLastSentAt(id, new Date());
     }
   } catch (error) {
     console.error('Failed to process scheduled pushes', error);
