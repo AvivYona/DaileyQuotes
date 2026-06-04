@@ -107,6 +107,13 @@ functions:
           path: save-user-push
           method: post
           cors: true
+  deleteUserPush:
+    handler: dist/handlers/deleteUserPush.handler
+    events:
+      - http:
+          path: delete-user-push
+          method: post
+          cors: true
   sendScheduledPushes:
     handler: dist/handlers/sendScheduledPushes.handler
     events:

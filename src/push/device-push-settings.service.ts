@@ -56,6 +56,12 @@ export const upsertPushSetting = async (details: UpsertDetails) => {
     .exec();
 };
 
+export const deletePushSetting = async (expoPushToken: string) => {
+  await connectToDatabase();
+  const model = getModel();
+  return model.deleteOne({ expoPushToken }).exec();
+};
+
 export const listPushSettings = async () => {
   await connectToDatabase();
   const model = getModel();
