@@ -122,5 +122,6 @@ functions:
           cors: true
   sendScheduledPushes:
     handler: dist/handlers/sendScheduledPushes.handler
+    timeout: 60
     events:
       - schedule: cron(0/1 * * * ? *)
