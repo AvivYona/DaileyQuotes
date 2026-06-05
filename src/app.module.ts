@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthorsModule } from './authors/authors.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { BackgroundsModule } from './backgrounds/backgrounds.module';
+import { AppConfigModule } from './app-config/app-config.module';
 import { databaseConfig } from './config/database.config';
 
 @Module({
@@ -21,6 +22,7 @@ import { databaseConfig } from './config/database.config';
     AuthorsModule,
     QuotesModule,
     BackgroundsModule,
+    AppConfigModule,
   ],
   controllers: [],
   providers: [],
