@@ -1,5 +1,6 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { deletePushSetting } from '../push/device-push-settings.service';
+import { tokenSuffix } from '../push/logging';
 
 type DeletePushPayload = {
   expoPushToken?: string;
@@ -46,16 +47,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     });
   }
 
+  const tokenLabel = tokenSuffix(expoPushToken);
+  console.log(`[push:delete] req token=${tokenLabel}`);
+
   try {
     const result = await deletePushSetting(expoPushToken);
+
+    const deletedCount = result?.deletedCount ?? 0;
+    console.log(`[push:delete] ok token=${tokenLabel} deleted=${deletedCount}`);
 
     // Idempotent: succeed whether or not a document existed.
     return buildResponse(200, {
       success: true,
-      deletedCount: result?.deletedCount ?? 0,
+      deletedCount,
     });
   } catch (error) {
-    console.error('Failed to delete push settings', error);
+    console.error(`[push:delete] ERR token=${tokenLabel} err=`, error);
     return buildResponse(500, { message: 'Failed to delete push settings' });
   }
 };

@@ -1,5 +1,6 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { upsertPushSetting } from '../push/device-push-settings.service';
+import { tokenSuffix } from '../push/logging';
 
 type SavePushPayload = {
   expoPushToken?: string;
@@ -83,6 +84,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return buildResponse(400, { message: 'timeZone must be a valid IANA name' });
   }
 
+  const tokenLabel = tokenSuffix(expoPushToken);
+  console.log(
+    `[push:save] req token=${tokenLabel} hour=${hour} minute=${minute} tz=${timeZone}`,
+  );
+
   try {
     await upsertPushSetting({
       expoPushToken,
@@ -91,9 +97,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       timeZone,
     });
 
+    console.log(`[push:save] ok token=${tokenLabel}`);
     return buildResponse(200, { success: true });
   } catch (error) {
-    console.error('Failed to save push settings', error);
+    console.error(`[push:save] ERR token=${tokenLabel} err=`, error);
     return buildResponse(500, { message: 'Failed to save push settings' });
   }
 };

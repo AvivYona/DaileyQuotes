@@ -100,7 +100,7 @@ const toLocalTimeSnapshot = (
       minute: Number.parseInt(minutePart, 10),
     };
   } catch (error) {
-    console.error(`Failed to compute local time for timezone ${timeZone}`, error);
+    console.error(`[push:tz] failed to compute local time for tz=${timeZone}`, error);
     return null;
   }
 };

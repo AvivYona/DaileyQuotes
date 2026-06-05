@@ -10,6 +10,9 @@ import { Author, AuthorDocument, AuthorSchema } from '../schemas/author.schema';
 import { QuotesService } from '../quotes/quotes.service';
 import { connectToDatabase } from '../database/connection';
 import { isShabbatOrYomTov } from '../common/shabbat-restriction';
+import { tokenSuffix } from '../push/logging';
+
+type SendResult = { ok: boolean; reason?: string };
 
 type QuoteForPush = {
   _id: string;
@@ -83,7 +86,7 @@ const mapQuoteForPush = (quote: any): QuoteForPush => {
 const sendExpoNotification = async (
   expoPushToken: string,
   quote: QuoteForPush,
-): Promise<boolean> => {
+): Promise<SendResult> => {
   const body = quote.quote;
   const authorName = quote.author?.name;
   const title = `${authorName}`;
@@ -106,43 +109,51 @@ const sendExpoNotification = async (
     });
 
     if (!response.ok) {
-      console.error(`Expo push request failed with status ${response.status}`);
-      return false;
+      return { ok: false, reason: `http ${response.status}` };
     }
 
     const result = await response.json();
     if (result?.data?.status === 'ok') {
-      return true;
+      return { ok: true };
     }
 
     if (Array.isArray(result?.data)) {
       const first = result.data[0];
       if (first?.status === 'ok') {
-        return true;
+        return { ok: true };
       }
-      console.error('Expo push returned errors', first);
-    } else {
-      console.error('Unexpected Expo push response', result);
+      const reason =
+        first?.message ?? first?.details?.error ?? 'expo error';
+      return { ok: false, reason };
     }
 
-    return false;
+    return { ok: false, reason: 'unexpected response shape' };
   } catch (error) {
-    console.error('Failed to send Expo push notification', error);
-    return false;
+    const reason =
+      error instanceof Error ? error.message : 'fetch failed';
+    return { ok: false, reason };
   }
 };
 
 
 export const handler: ScheduledHandler = async () => {
+  const startedAt = Date.now();
+  let sent = 0;
+  let failed = 0;
+  let skippedDedup = 0;
+
   try {
     const restriction = await isShabbatOrYomTov();
-    console.log(`Shabbat/Yom Tov restriction: ${restriction ? restriction.title : 'none'}`);
+    console.log(
+      `[push:send] restriction=${restriction ? restriction.title : 'none'}`,
+    );
     if (restriction) {
       return;
     }
 
     const now = new Date();
     const devices: DevicePushSettingDocument[] = await listPushSettingsDue(now);
+    console.log(`[push:send] start due=${devices.length}`);
     if (!devices.length) {
       return;
     }
@@ -158,6 +169,7 @@ export const handler: ScheduledHandler = async () => {
             : undefined;
 
       if (lastSentAt && now.getTime() - lastSentAt.getTime() < 60_000) {
+        skippedDedup++;
         continue;
       }
 
@@ -172,12 +184,22 @@ export const handler: ScheduledHandler = async () => {
         continue;
       }
 
-      const sent = await sendExpoNotification(device.expoPushToken, quote);
-      if (sent) {
+      const result = await sendExpoNotification(device.expoPushToken, quote);
+      if (result.ok) {
+        sent++;
         await updateLastSentAt(device._id as Types.ObjectId, now);
+      } else {
+        failed++;
+        console.error(
+          `[push:send] FAIL deviceId=${device._id} token=${tokenSuffix(device.expoPushToken)} reason=${result.reason}`,
+        );
       }
     }
   } catch (error) {
-    console.error('Failed to process scheduled pushes', error);
+    console.error('[push:send] ERR', error);
+  } finally {
+    console.log(
+      `[push:send] done sent=${sent} failed=${failed} skipped_dedup=${skippedDedup} dur=${Date.now() - startedAt}ms`,
+    );
   }
 };
