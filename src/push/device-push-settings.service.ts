@@ -147,3 +147,15 @@ export const updateLastSentAt = async (
     )
     .exec();
 };
+
+export const bulkUpdateLastSentAt = async (
+  ids: mongoose.Types.ObjectId[],
+  timestamp: Date,
+) => {
+  if (!ids.length) return;
+  await connectToDatabase();
+  const model = getModel();
+  await model
+    .updateMany({ _id: { $in: ids } }, { $set: { lastSentAt: timestamp } })
+    .exec();
+};

@@ -65,6 +65,23 @@ export class QuotesService {
     return randomQuote;
   }
 
+  async findRandomMany(count: number): Promise<Quote[]> {
+    if (count <= 0) {
+      return [];
+    }
+
+    const quotes = await this.quoteModel
+      .aggregate([{ $sample: { size: count } }])
+      .exec();
+
+    if (!quotes.length) {
+      return [];
+    }
+
+    await this.authorModel.populate(quotes, { path: 'author', select: 'name' });
+    return quotes as Quote[];
+  }
+
   async findOne(id: string): Promise<Quote> {
     const quote = await this.quoteModel
       .findById(id)
