@@ -100,6 +100,12 @@ functions:
       - httpApi:
           path: /authors/{id}
           method: delete
+      - httpApi:
+          path: /app-config
+          method: get
+      - httpApi:
+          path: /app-config
+          method: patch
   saveUserPush:
     handler: dist/handlers/saveUserPush.handler
     events:
@@ -107,7 +113,15 @@ functions:
           path: save-user-push
           method: post
           cors: true
+  deleteUserPush:
+    handler: dist/handlers/deleteUserPush.handler
+    events:
+      - http:
+          path: delete-user-push
+          method: post
+          cors: true
   sendScheduledPushes:
     handler: dist/handlers/sendScheduledPushes.handler
+    timeout: 60
     events:
       - schedule: cron(0/1 * * * ? *)
