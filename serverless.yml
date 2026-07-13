@@ -120,6 +120,13 @@ functions:
           path: delete-user-push
           method: post
           cors: true
+  updateWantRandomQuote:
+    handler: dist/handlers/updateWantRandomQuote.handler
+    events:
+      - http:
+          path: update-want-random-quote
+          method: post
+          cors: true
   sendScheduledPushes:
     handler: dist/handlers/sendScheduledPushes.handler
     timeout: 60

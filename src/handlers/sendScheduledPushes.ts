@@ -2,7 +2,10 @@ import { ScheduledHandler } from 'aws-lambda';
 import mongoose, { Model, Types } from 'mongoose';
 import {
   listPushSettingsDue,
+  listRandomPushSettingsDue,
   bulkUpdateLastSentAt,
+  bulkScheduleNextRandomSendAt,
+  MATCH_WINDOW_MINUTES,
 } from '../push/device-push-settings.service';
 import { DevicePushSettingDocument } from '../schemas/device-push-setting.schema';
 import { Quote, QuoteDocument, QuoteSchema } from '../schemas/quote.schema';
@@ -82,6 +85,11 @@ const mapQuoteForPush = (quote: any): QuoteForPush => {
     author,
   };
 };
+
+// A device stays "due" for the whole fixed-slot match window (see
+// MATCH_WINDOW_MINUTES), so it can appear on several consecutive ticks. Dedup on
+// lastSentAt over a window that exceeds the match window so it's only sent once.
+const DEDUP_WINDOW_MS = (MATCH_WINDOW_MINUTES + 1) * 60_000;
 
 // Expo accepts up to 100 messages per push request.
 const EXPO_CHUNK_SIZE = 100;
@@ -171,8 +179,20 @@ export const handler: ScheduledHandler = async () => {
     }
 
     const now = new Date();
-    const devices: DevicePushSettingDocument[] = await listPushSettingsDue(now);
-    console.log(`[push:send] start due=${devices.length}`);
+    const fixedDevices: DevicePushSettingDocument[] =
+      await listPushSettingsDue(now);
+    const randomDevices: DevicePushSettingDocument[] =
+      await listRandomPushSettingsDue(now);
+    // A random-enabled device can be due on its fixed slot AND its random slot
+    // in the same tick; keep one entry per device so it isn't sent twice.
+    const byId = new Map<string, DevicePushSettingDocument>();
+    for (const device of [...fixedDevices, ...randomDevices]) {
+      byId.set(String(device._id), device);
+    }
+    const devices = [...byId.values()];
+    console.log(
+      `[push:send] start due=${devices.length} fixed=${fixedDevices.length} random=${randomDevices.length}`,
+    );
     if (!devices.length) {
       return;
     }
@@ -188,7 +208,7 @@ export const handler: ScheduledHandler = async () => {
             ? new Date(device.lastSentAt)
             : undefined;
 
-      if (lastSentAt && now.getTime() - lastSentAt.getTime() < 60_000) {
+      if (lastSentAt && now.getTime() - lastSentAt.getTime() < DEDUP_WINDOW_MS) {
         skippedDedup++;
         return false;
       }
@@ -196,6 +216,7 @@ export const handler: ScheduledHandler = async () => {
     });
 
     if (!eligible.length) {
+      await bulkScheduleNextRandomSendAt(randomDevices, now);
       return;
     }
 
@@ -203,6 +224,7 @@ export const handler: ScheduledHandler = async () => {
     const quotePool = await quotesService.findRandomMany(eligible.length);
     if (!quotePool.length) {
       console.error('[push:send] no quotes available');
+      await bulkScheduleNextRandomSendAt(randomDevices, now);
       return;
     }
 
@@ -257,6 +279,10 @@ export const handler: ScheduledHandler = async () => {
 
     // 5. Bulk-record lastSentAt for everything that went out.
     await bulkUpdateLastSentAt(sentIds, now);
+
+    // 6. Draw tomorrow's slot for every random-time device that was due this
+    // tick, whether its send succeeded or not (one attempt per day).
+    await bulkScheduleNextRandomSendAt(randomDevices, now);
   } catch (error) {
     console.error('[push:send] ERR', error);
   } finally {
