@@ -100,7 +100,10 @@ const toLocalTimeSnapshot = (
       minute: Number.parseInt(minutePart, 10),
     };
   } catch (error) {
-    console.error(`[push:tz] failed to compute local time for tz=${timeZone}`, error);
+    console.error(
+      `[push:tz] failed to compute local time for tz=${timeZone}`,
+      error,
+    );
     return null;
   }
 };
@@ -158,4 +161,16 @@ export const bulkUpdateLastSentAt = async (
   await model
     .updateMany({ _id: { $in: ids } }, { $set: { lastSentAt: timestamp } })
     .exec();
+};
+
+// Delete devices whose tokens Expo reported as DeviceNotRegistered. Returns the
+// number removed so the caller can log how many dead tokens were pruned.
+export const bulkDeletePushSettings = async (
+  ids: mongoose.Types.ObjectId[],
+): Promise<{ deletedCount: number }> => {
+  if (!ids.length) return { deletedCount: 0 };
+  await connectToDatabase();
+  const model = getModel();
+  const result = await model.deleteMany({ _id: { $in: ids } }).exec();
+  return { deletedCount: result.deletedCount ?? 0 };
 };
