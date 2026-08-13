@@ -13,7 +13,7 @@ export class QuotesService {
     @InjectModel(Author.name) private authorModel: Model<AuthorDocument>,
   ) {}
 
-  async ensureAuthorExists(authorId: string): Promise<Types.ObjectId> {
+  private async ensureAuthorExists(authorId: string): Promise<Types.ObjectId> {
     if (!Types.ObjectId.isValid(authorId)) {
       throw new NotFoundException(`Author with ID ${authorId} not found`);
     }
