@@ -115,6 +115,9 @@ type ExpoMessage = {
   // Android channel the app creates on launch (App.tsx, HIGH importance). Without
   // it Expo uses the fallback "Miscellaneous" channel. iOS ignores this field.
   channelId: string;
+  // Without a sound Android posts the notification silently, so it never pops up
+  // as a heads-up banner even on the HIGH channel. iOS also plays its sound.
+  sound: 'default';
   data: {
     quoteId: string;
     authorId?: string;
@@ -130,6 +133,7 @@ const buildExpoMessage = (
   body: quote.quote,
   priority: 'high',
   channelId: 'daily-quotes',
+  sound: 'default',
   data: {
     quoteId: quote._id,
     authorId: quote.author?._id,
