@@ -112,6 +112,9 @@ type ExpoMessage = {
   // (Android Doze can otherwise hold a default-priority push for ~30-60s, which
   // makes a 12:00 quote show up at 12:01).
   priority: 'high';
+  // Android channel the app creates on launch (App.tsx, HIGH importance). Without
+  // it Expo uses the fallback "Miscellaneous" channel. iOS ignores this field.
+  channelId: string;
   data: {
     quoteId: string;
     authorId?: string;
@@ -126,6 +129,7 @@ const buildExpoMessage = (
   title: `${quote.author?.name}`,
   body: quote.quote,
   priority: 'high',
+  channelId: 'daily-quotes',
   data: {
     quoteId: quote._id,
     authorId: quote.author?._id,

@@ -16,6 +16,11 @@ provider:
   iam:
     role: arn:aws:iam::551566338738:role/emuna-lambda-rule
 
+custom:
+  # Production runs on the default stage "dev" (the app calls .../dev/save-user-push).
+  sendSchedulesEnabled:
+    dev: true
+
 package:
   patterns:
     - '!src/**'
@@ -124,4 +129,8 @@ functions:
     handler: dist/handlers/sendScheduledPushes.handler
     timeout: 60
     events:
-      - schedule: cron(0/1 * * * ? *)
+      - schedule:
+          rate: cron(0/1 * * * ? *)
+          # All stages share the same MongoDB, so only the live stage (dev) may send.
+          # When other stages also ran every minute they double-sent quotes and drew Expo 429s.
+          enabled: ${self:custom.sendSchedulesEnabled.${sls:stage}, false}
