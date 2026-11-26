@@ -62,6 +62,22 @@ export const deletePushSetting = async (expoPushToken: string) => {
   return model.deleteOne({ expoPushToken }).exec();
 };
 
+// Stops the scheduled daily quote for a device but keeps its token for
+// broadcast announcements: without hour/minute it never matches
+// listPushSettingsDue. Creates the record if the device was never registered
+// (fresh 2.0+ installs), which adds it to the broadcast list.
+export const disableDailyQuote = async (expoPushToken: string) => {
+  await connectToDatabase();
+  const model = getModel();
+  return model
+    .findOneAndUpdate(
+      { expoPushToken },
+      { $set: { expoPushToken }, $unset: { hour: '', minute: '' } },
+      { upsert: true, new: true, timestamps: true },
+    )
+    .exec();
+};
+
 export const listPushSettings = async () => {
   await connectToDatabase();
   const model = getModel();

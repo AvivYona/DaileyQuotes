@@ -125,6 +125,15 @@ functions:
           path: delete-user-push
           method: post
           cors: true
+  # App 2.0+ shows the daily quote locally. This stops the server's daily quote
+  # for a device but keeps its token, so broadcast announcements still reach it.
+  disableDailyQuote:
+    handler: dist/handlers/disableDailyQuote.handler
+    events:
+      - http:
+          path: disable-daily-quote
+          method: post
+          cors: true
   sendScheduledPushes:
     handler: dist/handlers/sendScheduledPushes.handler
     timeout: 60
